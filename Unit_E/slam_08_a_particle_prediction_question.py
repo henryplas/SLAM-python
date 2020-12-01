@@ -39,27 +39,33 @@ class ParticleFilter:
 
     def predict(self, control):
         """The prediction step of the particle filter."""
-        left, right = control
+        l, r = control
+        alpha_1 = self.control_motion_factor
+        alpha_2 = self.control_turn_factor
 
-        # --->>> Put your code here.
+        left_var = (alpha_1 * l)**2 + (alpha_2 * (l-r))**2
+        right_var = (alpha_1 * r)**2 + (alpha_2 * (l-r))**2
+        left_std = sqrt(left_var)
+        right_std = sqrt(right_var)
 
-        # Compute left and right variance.
-        # alpha_1 is self.control_motion_factor.
-        # alpha_2 is self.control_turn_factor.
-        # Then, do a loop over all self.particles and construct a new
-        # list of particles.
-        # In the end, assign the new list of particles to self.particles.
-        # For sampling, use random.gauss(mu, sigma). (Note sigma in this call
-        # is the standard deviation, not the variance.)
+        new_part = []
+        for particle in self.particles:
+        	l_prime = random.gauss(l, left_std)
+        	r_prime = random.gauss(r, right_std)
+        	p_u = [l_prime,r_prime]
+        	new_part.append(self.g(particle, p_u, self.robot_width))
+
+
+        self.particles = new_part
 
     def print_particles(self, file_desc):
         """Prints particles to given file_desc output."""
         if not self.particles:
             return
-        print >> file_desc, "PA",
+        print("PA", file=file_desc, end=' ')
         for p in self.particles:
-            print >> file_desc, "%.0f %.0f %.3f" % p,
-        print >> file_desc
+            print("%.0f %.0f %.3f" % p, file=file_desc, end=' ')
+        print(file=file_desc)
 
 
 if __name__ == '__main__':
@@ -77,10 +83,10 @@ if __name__ == '__main__':
     measured_state = (1850.0, 1897.0, 213.0 / 180.0 * pi)
     standard_deviations = (100.0, 100.0, 10.0 / 180.0 * pi)
     initial_particles = []
-    for i in xrange(number_of_particles):
+    for i in range(number_of_particles):
         initial_particles.append(tuple([
             random.gauss(measured_state[j], standard_deviations[j])
-            for j in xrange(3)]))
+            for j in range(3)]))
 
     # Setup filter.
     pf = ParticleFilter(initial_particles,
@@ -94,7 +100,7 @@ if __name__ == '__main__':
     # Loop over all motor tick records.
     # This is the particle filter loop, with prediction and correction.
     f = open("particle_filter_predicted.txt", "w")
-    for i in xrange(len(logfile.motor_ticks)):
+    for i in range(len(logfile.motor_ticks)):
         # Prediction.
         control = map(lambda x: x * ticks_to_mm, logfile.motor_ticks[i])
         pf.predict(control)

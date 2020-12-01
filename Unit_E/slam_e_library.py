@@ -6,7 +6,7 @@ from lego_robot import LegoLogfile
 # Find the derivative in scan data, ignoring invalid measurements.
 def compute_derivative(scan, min_dist):
     jumps = [ 0 ]
-    for i in xrange(1, len(scan) - 1):
+    for i in range(1, len(scan) - 1):
         l = scan[i-1]
         r = scan[i+1]
         if l > min_dist and r > min_dist:
@@ -24,7 +24,7 @@ def find_cylinders(scan, scan_derivative, jump, min_dist):
     on_cylinder = False
     sum_ray, sum_depth, rays = 0.0, 0.0, 0
 
-    for i in xrange(len(scan_derivative)):
+    for i in range(len(scan_derivative)):
         if scan_derivative[i] < -jump:
             # Start a new cylinder, independent of on_cylinder.
             on_cylinder = True

@@ -7,115 +7,136 @@ from slam_e_library import get_cylinders_from_scan, assign_cylinders
 from math import sin, cos, pi, atan2, sqrt
 import random
 from scipy.stats import norm as normal_dist
+import numpy as np
 
 
 class ParticleFilter:
-    def __init__(self, initial_particles,
-                 robot_width, scanner_displacement,
-                 control_motion_factor, control_turn_factor,
-                 measurement_distance_stddev, measurement_angle_stddev):
-        # The particles.
-        self.particles = initial_particles
+	def __init__(self, initial_particles,
+				 robot_width, scanner_displacement,
+				 control_motion_factor, control_turn_factor,
+				 measurement_distance_stddev, measurement_angle_stddev):
+		# The particles.
+		self.particles = initial_particles
 
-        # Some constants.
-        self.robot_width = robot_width
-        self.scanner_displacement = scanner_displacement
-        self.control_motion_factor = control_motion_factor
-        self.control_turn_factor = control_turn_factor
-        self.measurement_distance_stddev = measurement_distance_stddev
-        self.measurement_angle_stddev = measurement_angle_stddev
+		# Some constants.
+		self.robot_width = robot_width
+		self.scanner_displacement = scanner_displacement
+		self.control_motion_factor = control_motion_factor
+		self.control_turn_factor = control_turn_factor
+		self.measurement_distance_stddev = measurement_distance_stddev
+		self.measurement_angle_stddev = measurement_angle_stddev
 
-    # State transition. This is exactly the same method as in the Kalman filter.
-    @staticmethod
-    def g(state, control, w):
-        x, y, theta = state
-        l, r = control
-        if r != l:
-            alpha = (r - l) / w
-            rad = l/alpha
-            g1 = x + (rad + w/2.)*(sin(theta+alpha) - sin(theta))
-            g2 = y + (rad + w/2.)*(-cos(theta+alpha) + cos(theta))
-            g3 = (theta + alpha + pi) % (2*pi) - pi
-        else:
-            g1 = x + l * cos(theta)
-            g2 = y + l * sin(theta)
-            g3 = theta
+	# State transition. This is exactly the same method as in the Kalman filter.
+	@staticmethod
+	def g(state, control, w):
+		x, y, theta = state
+		l, r = control
+		if r != l:
+			alpha = (r - l) / w
+			rad = l/alpha
+			g1 = x + (rad + w/2.)*(sin(theta+alpha) - sin(theta))
+			g2 = y + (rad + w/2.)*(-cos(theta+alpha) + cos(theta))
+			g3 = (theta + alpha + pi) % (2*pi) - pi
+		else:
+			g1 = x + l * cos(theta)
+			g2 = y + l * sin(theta)
+			g3 = theta
 
-        return (g1, g2, g3)
+		return (g1, g2, g3)
 
-    def predict(self, control):
-        """The prediction step of the particle filter."""
+	def predict(self, control):
+		"""The prediction step of the particle filter."""
+		l, r = control
+		alpha_1 = self.control_motion_factor
+		alpha_2 = self.control_turn_factor
 
-        # --->>> Insert code from previous question here.
-        pass  # Remove this.
+		left_var = (alpha_1 * l)**2 + (alpha_2 * (l-r))**2
+		right_var = (alpha_1 * r)**2 + (alpha_2 * (l-r))**2
+		left_std = sqrt(left_var)
+		right_std = sqrt(right_var)
 
-    # Measurement. This is exactly the same method as in the Kalman filter.
-    @staticmethod
-    def h(state, landmark, scanner_displacement):
-        """Takes a (x, y, theta) state and a (x, y) landmark, and returns the
-           corresponding (range, bearing)."""
-        dx = landmark[0] - (state[0] + scanner_displacement * cos(state[2]))
-        dy = landmark[1] - (state[1] + scanner_displacement * sin(state[2]))
-        r = sqrt(dx * dx + dy * dy)
-        alpha = (atan2(dy, dx) - state[2] + pi) % (2*pi) - pi
-        return (r, alpha)
+		new_part = []
+		for particle in self.particles:
+			l_prime = random.gauss(l, left_std)
+			r_prime = random.gauss(r, right_std)
+			p_u = [l_prime,r_prime]
+			new_part.append(self.g(particle, p_u, self.robot_width))
 
-    def probability_of_measurement(self, measurement, predicted_measurement):
-        """Given a measurement and a predicted measurement, computes
-           probability."""
-        # Compute differences to real measurements.
+		self.particles = new_part
 
-        # --->>> Compute difference in distance and bearing angle.
-        # Important: make sure the angle difference works correctly and does
-        # not return values offset by 2 pi or - 2 pi.
-        # You may use the following Gaussian PDF function:
-        # scipy.stats.norm.pdf(x, mu, sigma). With the import in the header,
-        # this is normal_dist.pdf(x, mu, sigma).
-        # Note that the two parameters sigma_d and sigma_alpha discussed
-        # in the lecture are self.measurement_distance_stddev and
-        # self.measurement_angle_stddev.
-        return 1.0  # Replace this.
 
-    def compute_weights(self, cylinders, landmarks):
-        """Computes one weight for each particle, returns list of weights."""
-        weights = []
-        for p in self.particles:
-            # Get list of tuples:
-            # [ ((range_0, bearing_0), (landmark_x, landmark_y)), ... ]
-            assignment = assign_cylinders(cylinders, p,
-                self.scanner_displacement, landmarks)
+	# Measurement. This is exactly the same method as in the Kalman filter.
+	@staticmethod
+	def h(state, landmark, scanner_displacement):
+		"""Takes a (x, y, theta) state and a (x, y) landmark, and returns the
+		   corresponding (range, bearing)."""
 
-            # --->>> Insert code to compute weight for particle p here.
-            # This will require a loop over all (measurement, landmark)
-            # in assignment. Append weight to the list of weights.
-            weights.append(1.0)  # Replace this.
-        return weights
+		dx = landmark[0] - (state[0] + scanner_displacement * cos(state[2]))
+		dy = landmark[1] - (state[1] + scanner_displacement * sin(state[2]))
+		r = sqrt(dx * dx + dy * dy)
+		alpha = (atan2(dy, dx) - state[2] + pi) % (2*pi) - pi
+		return (r, alpha)
 
-    def resample(self, weights):
-        """Return a list of particles which have been resampled, proportional
-           to the given weights."""
+	def probability_of_measurement(self, measurement, predicted_measurement):
+		"""Given a measurement and a predicted measurement, computes
+		   probability."""
 
-        # --->>> Insert your code here.
-        # You may implement the 'resampling wheel' algorithm
-        # described in the lecture.
-        new_particles = self.particles  # Replace this.
-        return new_particles
+		d, alpha = measurement
+		d_prime, alpha_prime = predicted_measurement
 
-    def correct(self, cylinders, landmarks):
-        """The correction step of the particle filter."""
-        # First compute all weights.
-        weights = self.compute_weights(cylinders, landmarks)
-        # Then resample, based on the weight array.
-        self.particles = self.resample(weights)
+		alpha = atan2(sin(alpha), cos(alpha))
+		alpha_prime = atan2(sin(alpha_prime), cos(alpha_prime))
 
-    def print_particles(self, file_desc):
-        """Prints particles to given file_desc output."""
-        if not self.particles:
-            return
-        print >> file_desc, "PA",
-        for p in self.particles:
-            print >> file_desc, "%.0f %.0f %.3f" % p,
-        print >> file_desc
+		delta_alpha = alpha - alpha_prime
+		delta_alpha = atan2(sin(delta_alpha), cos(delta_alpha))
+
+		ret = normal_dist.pdf(d - d_prime, 0 , self.measurement_distance_stddev) * \
+				normal_dist.pdf(delta_alpha, 0, self.measurement_angle_stddev)
+
+		return ret
+
+	def compute_weights(self, cylinders, landmarks):
+		"""Computes one weight for each particle, returns list of weights."""
+		weights = []
+		for p in self.particles:
+			# Get list of tuples:
+			# [ ((range_0, bearing_0), (landmark_x, landmark_y)), ... ]
+			assignment = assign_cylinders(cylinders, p,
+				self.scanner_displacement, landmarks)
+
+			prob = 1.
+			for tupl in assignment:
+				meas_prime = self.h(p, tupl[1], self.scanner_displacement)
+				prob *= self.probability_of_measurement(tupl[0], meas_prime)
+
+			weights.append(prob)
+		weights = np.array(weights)
+		total = sum(weights)
+		return weights/total
+
+	def resample(self, weights):
+		"""Return a list of particles which have been resampled, proportional
+		   to the given weights."""
+		num_particles = len(self.particles)
+
+		return [self.particles[np.random.choice(num_particles, p=weights)]
+				for i in range(num_particles)]
+
+	def correct(self, cylinders, landmarks):
+		"""The correction step of the particle filter."""
+		# First compute all weights.
+		weights = self.compute_weights(cylinders, landmarks)
+		# Then resample, based on the weight array.
+		self.particles = self.resample(weights)
+
+	def print_particles(self, file_desc):
+		"""Prints particles to given file_desc output."""
+		if not self.particles:
+			return
+		print("PA", file=file_desc, end=' ')
+		for p in self.particles:
+			print("%.0f %.0f %.3f" % p, file=file_desc, end=' ')
+		print(file=file_desc)
 
 
 if __name__ == '__main__':
@@ -135,15 +156,15 @@ if __name__ == '__main__':
     measurement_distance_stddev = 200.0  # Distance measurement error of cylinders.
     measurement_angle_stddev = 15.0 / 180.0 * pi  # Angle measurement error.
 
-    # Generate initial particles. Each particle is (x, y, theta).
-    number_of_particles = 50
+    # Generate initial particles. Each particle is (x)
+    number_of_particles = 200
     measured_state = (1850.0, 1897.0, 213.0 / 180.0 * pi)
     standard_deviations = (100.0, 100.0, 10.0 / 180.0 * pi)
     initial_particles = []
-    for i in xrange(number_of_particles):
+    for i in range(number_of_particles):
         initial_particles.append(tuple([
             random.gauss(measured_state[j], standard_deviations[j])
-            for j in xrange(3)]))
+            for j in range(3)]))
 
     # Setup filter.
     pf = ParticleFilter(initial_particles,
@@ -162,7 +183,7 @@ if __name__ == '__main__':
     # Loop over all motor tick records.
     # This is the particle filter loop, with prediction and correction.
     f = open("particle_filter_corrected.txt", "w")
-    for i in xrange(len(logfile.motor_ticks)):
+    for i in range(len(logfile.motor_ticks)):
         # Prediction.
         control = map(lambda x: x * ticks_to_mm, logfile.motor_ticks[i])
         pf.predict(control)
