@@ -6,6 +6,7 @@ from math import sin, cos, pi
 # If so, set this to true.
 s_record_has_count = True
 
+
 # Class holding log data of our Lego robot.
 # The logfile understands the following records:
 # P reference position (of the robot)
@@ -16,8 +17,7 @@ s_record_has_count = True
 # E (error) standard deviation in position, or position and heading angle
 # L landmark (reference landmark, fixed)
 # D detected landmark, in the scanner's coordinate system. C is cylinders
-# W something to draw in the world coordinate system.
-#   C is cylinders, E is 2D error ellipses
+# W something to draw in the world coordinate system. C is cylinders
 # PA list of particles (x, y, heading).
 #
 class LegoLogfile(object):
@@ -62,8 +62,8 @@ class LegoLogfile(object):
             if sp[0] == 'P':
                 if first_reference_positions:
                     self.reference_positions = []
-                    first_reference_positions = False 
-                self.reference_positions.append( (int(sp[2]), int(sp[3])) )
+                    first_reference_positions = False
+                self.reference_positions.append((int(sp[2]), int(sp[3])))
 
             # S is the scan data.
             # File format:
@@ -105,7 +105,7 @@ class LegoLogfile(object):
                     first_motor_ticks = False
                     self.last_ticks = ticks
                 self.motor_ticks.append(
-                    tuple([ticks[i]-self.last_ticks[i] for i in range(2)]))
+                    tuple([ticks[i] - self.last_ticks[i] for i in range(2)]))
                 self.last_ticks = ticks
 
             # F is filtered trajectory. No time stamp is used.
@@ -116,7 +116,7 @@ class LegoLogfile(object):
                 if first_filtered_positions:
                     self.filtered_positions = []
                     first_filtered_positions = False
-                self.filtered_positions.append( tuple( map(float, sp[1:])) )
+                self.filtered_positions.append(tuple(map(float, sp[1:])))
 
             # E is error of filtered trajectory. No time stamp is used.
             # File format: E (angle of main axis)[in radians] std-dev1 std-dev2
@@ -130,8 +130,8 @@ class LegoLogfile(object):
                 if first_filtered_stddev:
                     self.filtered_stddev = []
                     first_filtered_stddev = False
-                self.filtered_stddev.append( tuple( map(float, sp[1:])) )
-                
+                self.filtered_stddev.append(tuple(map(float, sp[1:])))
+
             # L is landmark. This is actually background information, independent
             # of time.
             # File format: L <type> info...
@@ -143,8 +143,8 @@ class LegoLogfile(object):
                     self.landmarks = []
                     first_landmarks = False
                 if sp[1] == 'C':
-                    self.landmarks.append( tuple(['C'] + map(float, sp[2:])) )
-                    
+                    self.landmarks.append(tuple(['C'] + list(map(float, sp[2:]))))
+
             # D is detected landmarks (in each scan).
             # File format: D <type> info...
             # Supported types:
@@ -156,8 +156,9 @@ class LegoLogfile(object):
                     if first_detected_cylinders:
                         self.detected_cylinders = []
                         first_detected_cylinders = False
-                    cyl = map(float, sp[2:])
-                    self.detected_cylinders.append([(cyl[2*i], cyl[2*i+1]) for i in range(len(cyl)/2)])
+                    n = int(len(sp[2:]) / 2)
+                    cyl = list(map(float, sp[2:]))
+                    self.detected_cylinders.append([(cyl[2 * i], cyl[2 * i + 1]) for i in range(n)])
 
             # W is information to be plotted in the world (in each scan).
             # File format: W <type> info...
@@ -165,32 +166,29 @@ class LegoLogfile(object):
             # Cylinder: W C x y x y ...
             #   Stored: List of lists of (x, y) tuples of the cylinder positions,
             #   one list per scan.
-            # Error ellipses: W E angle axis1 axis, angle axis1 axis2 ...
-            #   where angle is the ellipse's orientations and axis1 and axis2 are the lenghts
-            #   of the two half axes.
-            #   Stored: List of lists of (angle, axis1, axis2) tuples.
-            #   Note the ellipses can be used only in combination with "W C", which will
-            #   define the center point of the ellipse.
             elif sp[0] == 'W':
                 if sp[1] == 'C':
                     if first_world_cylinders:
                         self.world_cylinders = []
                         first_world_cylinders = False
-                    cyl = map(float, sp[2:])
-                    self.world_cylinders.append([(cyl[2*i], cyl[2*i+1]) for i in range(len(cyl)/2)])
+                    n = int(len(sp[2:]) / 2)
+                    cyl = list(map(float, sp[2:]))
+                    self.world_cylinders.append([(cyl[2 * i], cyl[2 * i + 1]) for i in range(n)])
                 elif sp[1] == 'E':
                     if first_world_ellipses:
                         self.world_ellipses = []
                         first_world_ellipses = False
-                    ell = map(float, sp[2:])
-                    self.world_ellipses.append([(ell[3*i], ell[3*i+1], ell[3*i+2]) for i in xrange(len(ell)/3)])
+                    n = int(len(sp[2:]) / 3)
+                    ell = list(map(float, sp[2:]))
+                    self.world_ellipses.append(
+                        [(ell[3 * i], ell[3 * i + 1], ell[3 * i + 2]) for i in range(n)])
 
             # PA is particles.
             # File format:
             #  PA x0, y0, heading0, x1, y1, heading1, ...
             # Stored: A list of lists of tuples:
             #  [[(x0, y0, heading0), (x1, y1, heading1),...],
-            #   [(x0, y0, heading0), (x1, y1, heading1),...], ...] 
+            #   [(x0, y0, heading0), (x1, y1, heading1),...], ...]
             # where each list contains all particles of one time step.
             elif sp[0] == 'PA':
                 if first_particles:
@@ -199,7 +197,7 @@ class LegoLogfile(object):
                 i = 1
                 particle_list = []
                 while i < len(sp):
-                    particle_list.append(tuple(map(float, sp[i:i+3])))
+                    particle_list.append(tuple(map(float, sp[i:i + 3])))
                     i += 3
                 self.particles.append(particle_list)
 
@@ -214,7 +212,7 @@ class LegoLogfile(object):
                    len(self.particles))
 
     @staticmethod
-    def beam_index_to_angle(i, mounting_angle = -0.06981317007977318):
+    def beam_index_to_angle(i, mounting_angle=-0.06981317007977318):
         """Convert a beam index to an angle, in radians."""
         return (i - 330.0) * 0.006135923151543 + mounting_angle
 
@@ -226,7 +224,7 @@ class LegoLogfile(object):
         dx = cos(pose[2])
         dy = sin(pose[2])
         x, y = point
-        return (x * dx - y * dy + pose[0], x * dy + y * dx + pose[1])        
+        return (x * dx - y * dy + pose[0], x * dy + y * dx + pose[1])
 
     def info(self, i):
         """Prints reference pos, number of scan points, and motor ticks."""
@@ -245,14 +243,14 @@ class LegoLogfile(object):
                     s += " %d" % idx
             else:
                 s += " | (no pole indices)"
-                    
+
         if i < len(self.motor_ticks):
             s += " | motor: %d %d" % self.motor_ticks[i]
 
         if i < len(self.filtered_positions):
             f = self.filtered_positions[i]
             s += " | filtered-pos:"
-            for j in (0,1):
+            for j in (0, 1):
                 s += " %.1f" % f[j]
             if len(f) > 2:
                 s += " %.1f" % (f[2] / pi * 180.)
@@ -262,7 +260,7 @@ class LegoLogfile(object):
             s += " | stddev:"
             # Print stddev in both axes, and theta, if present.
             # Don't print the orientation angle stddev[0].
-            for j in (1,2):
+            for j in (1, 2):
                 s += " %.1f" % stddev[j]
             if len(stddev) > 3:
                 s += " %.1f" % (stddev[3] / pi * 180.)

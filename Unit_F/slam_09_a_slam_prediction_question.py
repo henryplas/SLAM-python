@@ -84,38 +84,32 @@ class ExtendedKalmanFilterSLAM:
 
     def predict(self, control):
         """The prediction step of the Kalman filter."""
-        # covariance' = G * covariance * GT + R
-        # where R = V * (covariance in control space) * VT.
-        # Covariance in control space depends on move distance.
-        G3 = self.dg_dstate(self.state, control, self.robot_width)
+        n = len(self.state) - 3
+        N = 3 + 2*n
+
         left, right = control
         left_var = (self.control_motion_factor * left)**2 +\
                    (self.control_turn_factor * (left-right))**2
         right_var = (self.control_motion_factor * right)**2 +\
                     (self.control_turn_factor * (left-right))**2
         control_covariance = diag([left_var, right_var])
+        
         V = self.dg_dcontrol(self.state, control, self.robot_width)
+        
         R3 = dot(V, dot(control_covariance, V.T))
+        R = zeros((N, N))
+        R[0:3,0:3] = R3
 
-        # --->>> Put your code here.
+        G3 = self.dg_dstate(self.state, control, self.robot_width)
+        G = eye(N)
+        G[0:3,0:3] = G3
 
-        # Hints:
-        # - The number of landmarks is self.number_of_landmarks.
-        # - eye(n) is the numpy function which returns a n x n identity matrix.
-        # - zeros((n,n)) returns a n x n matrix which is all zero.
-        # - If M is a matrix, M[0:2,1:5] returns the submatrix which consists
-        #   of the rows 0 and 1 (but not 2) and the columns 1, 2, 3, 4.
-        #   This submatrix operator can be used on either side of an assignment.
-        # - Similarly for vectors: v[1:3] returns the vector consisting of the
-        #   elements 1 and 2, but not 3.
-        # - All matrix and vector indices start at 0.
-
-        # Now enlarge G3 and R3 to accomodate all landmarks. Then, compute the
-        # new covariance matrix self.covariance.
-        self.covariance = dot(G3, dot(self.covariance, G3.T)) + R3  # Replace this.
+        self.covariance = G @ self.covariance @ G.T + R
         # state' = g(state, control)
-        self.state = self.g(self.state, control, self.robot_width)  # Replace this.
+        self.state = self.g(self.state, control, self.robot_width)
 
+
+        
     @staticmethod
     def get_error_ellipse(covariance):
         """Return the position covariance (which is the upper 2x2 submatrix)
@@ -157,7 +151,7 @@ if __name__ == '__main__':
     # filtered positions and covariances.
     # This is the EKF SLAM loop.
     f = open("ekf_slam_prediction.txt", "w")
-    for i in xrange(len(logfile.motor_ticks)):
+    for i in range(len(logfile.motor_ticks)):
         # Prediction.
         control = array(logfile.motor_ticks[i]) * ticks_to_mm
         kf.predict(control)
@@ -165,12 +159,12 @@ if __name__ == '__main__':
         # End of EKF SLAM - from here on, data is written.
 
         # Output the center of the scanner, not the center of the robot.
-        print >> f, "F %f %f %f" % \
+        print("F %f %f %f" % \
             tuple(kf.state[0:3] + [scanner_displacement * cos(kf.state[2]),
                                    scanner_displacement * sin(kf.state[2]),
-                                   0.0])
+                                   0.0]), file=f)
         # Write covariance matrix in angle stddev1 stddev2 stddev-heading form
         e = ExtendedKalmanFilterSLAM.get_error_ellipse(kf.covariance)
-        print >> f, "E %f %f %f %f" % (e + (sqrt(kf.covariance[2,2]),))
+        print("E %f %f %f %f" % (e + (sqrt(kf.covariance[2,2]),)), file=f)
 
     f.close()

@@ -1,7 +1,13 @@
 # Python routines to inspect a ikg LEGO robot logfile.
 # Author: Claus Brenner, 28 OCT 2012
-from Tkinter import *
-import tkFileDialog
+from __future__ import print_function
+if 2/3 == 0:
+    from Tkinter import *
+    import tkFileDialog
+else:
+    from tkinter import *
+    from tkinter import filedialog as tkFileDialog
+
 from lego_robot import *
 from math import sin, cos, pi, ceil
 
@@ -19,14 +25,14 @@ max_scanner_range = 2200.0
 
 class DrawableObject(object):
     def draw(self, at_step):
-        print "To be overwritten - will draw a certain point in time:", at_step
+        print("To be overwritten - will draw a certain point in time:"), at_step
 
     def background_draw(self):
-        print "Background draw."
+        print("Background draw.")
 
     @staticmethod
     def get_ellipse_points(center, main_axis_angle, radius1, radius2,
-                           start_angle = 0.0, end_angle = 2 * pi):
+                           start_angle=0.0, end_angle=2 * pi):
         """Generate points of an ellipse, for drawing (y axis down)."""
         points = []
         ax = radius1 * cos(main_axis_angle)
@@ -37,15 +43,14 @@ class DrawableObject(object):
         N = int(ceil((end_angle - start_angle) / (2 * pi) * N_full))
         N = max(N, 1)
         increment = (end_angle - start_angle) / N
-        for i in xrange(N + 1):
+        for i in range(N + 1):
             a = start_angle + i * increment
             c = cos(a)
             s = sin(a)
-            x = c*ax + s*bx + center[0]
-            y = - c*ay - s*by + center[1]
-            points.append((x,y))
+            x = c * ax + s * bx + center[0]
+            y = - c * ay - s * by + center[1]
+            points.append((x, y))
         return points
-
 
 class Trajectory(DrawableObject):
     def __init__(self, points, canvas,
@@ -192,10 +197,10 @@ class Landmarks(DrawableObject):
     def draw(self, at_step):
         # Landmarks are background only.
         pass
-    
+
 class Points(DrawableObject):
     # Points, optionally with error ellipses.
-    def __init__(self, points, canvas, color = "red", radius = 5, ellipses = [], ellipse_factor = 1.0):
+    def __init__(self, points, canvas, color="red", radius=5, ellipses=[], ellipse_factor=1.0):
         self.points = points
         self.canvas = canvas
         self.color = color
@@ -209,15 +214,15 @@ class Points(DrawableObject):
 
     def draw(self, at_step):
         if self.cursor_objects:
-            map(self.canvas.delete, self.cursor_objects)
+            for obj in self.cursor_objects: self.canvas.delete(obj)
             self.cursor_objects = []
         if at_step < len(self.points):
-            for i in xrange(len(self.points[at_step])):
+            for i in range(len(self.points[at_step])):
                 # Draw point.
                 c = self.points[at_step][i]
                 self.cursor_objects.append(self.canvas.create_oval(
-                    c[0]-self.radius, c[1]-self.radius,
-                    c[0]+self.radius, c[1]+self.radius,
+                    c[0] - self.radius, c[1] - self.radius,
+                    c[0] + self.radius, c[1] + self.radius,
                     fill=self.color))
                 # Draw error ellipse if present.
                 if at_step < len(self.ellipses) and i < len(self.ellipses[at_step]):
@@ -243,7 +248,7 @@ class Particles(DrawableObject):
 
     def draw(self, at_step):
         if self.cursor_objects:
-            map(self.canvas.delete, self.cursor_objects)
+            for obj in self.cursor_objects: self.canvas.delete(obj)
             self.cursor_objects = []
         if at_step < len(self.particles):
             for c in self.particles[at_step]:
@@ -310,6 +315,18 @@ def load_data():
     draw_objects.append(Trajectory(positions, world_canvas, world_extents, canvas_extents,
         cursor_color="red", background_color="#FFB4B4"))
 
+    # Insert: filtered trajectory.
+    if logfile.filtered_positions:
+        if len(logfile.filtered_positions[0]) > 2:
+            positions = [tuple(list(to_world_canvas(pos, canvas_extents, world_extents)) + [pos[2]]) for pos in logfile.filtered_positions]
+        else:
+            positions = [to_world_canvas(pos, canvas_extents, world_extents) for pos in logfile.filtered_positions]
+        # If there is error ellipses, insert them as well.
+        draw_objects.append(Trajectory(positions, world_canvas, world_extents, canvas_extents,
+            standard_deviations = logfile.filtered_stddev,
+            cursor_color="blue", background_color="lightblue",
+            position_stddev_color = "#8080ff", theta_stddev_color="#c0c0ff"))
+
     # Insert: scanner data.
     draw_objects.append(ScannerData(logfile.scan_data, sensor_canvas,
         sensor_canvas_extents, max_scanner_range))
@@ -321,23 +338,11 @@ def load_data():
                      for cylinders_one_scan in logfile.detected_cylinders ]
         draw_objects.append(Points(positions, sensor_canvas, "#88FF88"))
 
-    # Insert: world objects, cylinders and corresponding world objects, ellipses.
-    if logfile.world_cylinders:
-        positions = [[to_world_canvas(pos, canvas_extents, world_extents)
-                      for pos in cylinders_one_scan]
-                      for cylinders_one_scan in logfile.world_cylinders]
-        # Also setup cylinders if present.
-        # Note this assumes correct aspect ratio.
-        factor = canvas_extents[0] / world_extents[0]
-        draw_objects.append(Points(positions, world_canvas, "#DC23C5",
-                                   ellipses = logfile.world_ellipses,
-                                   ellipse_factor = factor))
-
     # Insert: detected cylinders, transformed into world coord system.
     if logfile.detected_cylinders and logfile.filtered_positions and \
         len(logfile.filtered_positions[0]) > 2:
         positions = []
-        for i in xrange(min(len(logfile.detected_cylinders), len(logfile.filtered_positions))):
+        for i in range(min(len(logfile.detected_cylinders), len(logfile.filtered_positions))):
             this_pose_positions = []
             pos = logfile.filtered_positions[i]
             dx = cos(pos[2])
@@ -350,25 +355,39 @@ def load_data():
             positions.append(this_pose_positions)
         draw_objects.append(Points(positions, world_canvas, "#88FF88"))
 
+    # Insert: world objects, cylinders and corresponding world objects, ellipses
+    # This creates error ellipses around added landmarks detected by SLAM
+    if logfile.world_cylinders:
+        positions = [[to_world_canvas(pos, canvas_extents, world_extents)
+                      for pos in cylinders_one_scan]
+                      for cylinders_one_scan in logfile.world_cylinders]
+        # Also setup cylinders if present.
+        # Note this assumes correct aspect ratio.
+        factor = canvas_extents[0] / world_extents[0]
+        draw_objects.append(Points(positions, world_canvas, "#DC23C5",
+                                   ellipses=logfile.world_ellipses,
+                                   ellipse_factor=factor))
+
     # Insert: particles.
     if logfile.particles:
         positions = [
             [(to_world_canvas(pos, canvas_extents, world_extents) + (pos[2],))
-             for pos in particles_one_scan]
-             for particles_one_scan in logfile.particles]
+                for pos in particles_one_scan]
+            for particles_one_scan in logfile.particles]
         draw_objects.append(Particles(positions, world_canvas, "#80E080"))
 
     # Insert: filtered trajectory.
     if logfile.filtered_positions:
         if len(logfile.filtered_positions[0]) > 2:
-            positions = [tuple(list(to_world_canvas(pos, canvas_extents, world_extents)) + [pos[2]]) for pos in logfile.filtered_positions]
+            positions = [tuple(list(to_world_canvas(pos, canvas_extents, world_extents)) + [pos[2]]) for pos in
+                            logfile.filtered_positions]
         else:
             positions = [to_world_canvas(pos, canvas_extents, world_extents) for pos in logfile.filtered_positions]
         # If there is error ellipses, insert them as well.
         draw_objects.append(Trajectory(positions, world_canvas, world_extents, canvas_extents,
-            standard_deviations = logfile.filtered_stddev,
-            cursor_color="blue", background_color="lightblue",
-            position_stddev_color = "#8080ff", theta_stddev_color="#c0c0ff"))
+                                        standard_deviations=logfile.filtered_stddev,
+                                        cursor_color="blue", background_color="lightblue",
+                                        position_stddev_color="#8080ff", theta_stddev_color="#c0c0ff"))
 
     # Start new canvas and do all background drawing.
     world_canvas.delete(ALL)

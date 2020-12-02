@@ -89,18 +89,31 @@ class ExtendedKalmanFilterSLAM:
         # covariance' = G * covariance * GT + R
         # where R = V * (covariance in control space) * VT.
         # Covariance in control space depends on move distance.
-        G3 = self.dg_dstate(self.state, control, self.robot_width)
+
+        n = self.number_of_landmarks
+        N = 3 + 2*n
+        
         left, right = control
         left_var = (self.control_motion_factor * left)**2 +\
                    (self.control_turn_factor * (left-right))**2
         right_var = (self.control_motion_factor * right)**2 +\
                     (self.control_turn_factor * (left-right))**2
         control_covariance = diag([left_var, right_var])
-        V = self.dg_dcontrol(self.state, control, self.robot_width)
-        R3 = dot(V, dot(control_covariance, V.T))
+        
+        V = zeros((N,2))
+        V[0:3,0:2] = self.dg_dcontrol(self.state, control, self.robot_width)
+      	
+        R = dot(V, dot(control_covariance, V.T))
 
-        # --->>> Put here your previous code to compute the new
-        #        covariance and state.
+
+        G3 = self.dg_dstate(self.state, control, self.robot_width)
+        G = eye(N)
+        G[0:3,0:3] = G3
+
+        #print(G.shape, self.covariance.shape, R.shape, V.shape, self.state.shape)
+        self.covariance = G @ self.covariance @ G.T + R
+        # state' = g(state, control)
+        self.state[0:3] = self.g(self.state[0:3], control, self.robot_width)
 
     def add_landmark_to_state(self, initial_coords):
         """Enlarge the current state and covariance matrix to include one more
@@ -111,27 +124,28 @@ class ExtendedKalmanFilterSLAM:
         #        covariance matrix.
         #        Initialize the state with the given initial_coords and the
         #        covariance with 1e10 (as an approximation for "infinity".
-        # Hints:
-        # - If M is a matrix, use M[i:j,k:l] to obtain the submatrix of
-        #   rows i to j-1 and colums k to l-1. This can be used on the left and
-        #   right side of the assignment operator.
-        # - zeros(n) gives a zero vector of length n, eye(n) an n x n identity
-        #   matrix.
-        # - Do not forget to increment self.number_of_landmarks.
-        # - Do not forget to return the index of the newly added landmark. I.e.,
-        #   the first call should return 0, the second should return 1.
+        self.number_of_landmarks += 1
+        N = 3 + self.number_of_landmarks * 2
 
-        return -1  # Replace this.
+        cov = zeros((N, N))
+        cov[-2:, -2:] = diag([10e10, 10e10])
+        n = len(self.covariance[0])
+        cov[0:n, 0:n] = self.covariance
+        self.covariance = cov
+
+        new_state = hstack((self.state[:, ], array(initial_coords) ))
+        self.state = new_state
+        return self.number_of_landmarks - 1
 
     def get_landmarks(self):
         """Returns a list of (x, y) tuples of all landmark positions."""
         return ([(self.state[3+2*j], self.state[3+2*j+1])
-                 for j in xrange(self.number_of_landmarks)])
+                 for j in range(self.number_of_landmarks)])
 
     def get_landmark_error_ellipses(self):
         """Returns a list of all error ellipses, one for each landmark."""
         ellipses = []
-        for i in xrange(self.number_of_landmarks):
+        for i in range(self.number_of_landmarks):
             j = 3 + 2 * i
             ellipses.append(self.get_error_ellipse(
                 self.covariance[j:j+2, j:j+2]))
@@ -185,7 +199,7 @@ if __name__ == '__main__':
     # filtered positions and covariances.
     # This is the EKF SLAM loop.
     f = open("ekf_slam_add_landmarks.txt", "w")
-    for i in xrange(len(logfile.motor_ticks)):
+    for i in range(len(logfile.motor_ticks)):
         # Prediction.
         control = array(logfile.motor_ticks[i]) * ticks_to_mm
         kf.predict(control)
@@ -193,13 +207,13 @@ if __name__ == '__main__':
         # End of EKF SLAM - from here on, data is written.
 
         # Output the center of the scanner, not the center of the robot.
-        print >> f, "F %f %f %f" % \
+        print("F %f %f %f" % \
             tuple(kf.state[0:3] + [scanner_displacement * cos(kf.state[2]),
                                    scanner_displacement * sin(kf.state[2]),
-                                   0.0])
+                                   0.0]), file=f)
         # Write covariance matrix in angle stddev1 stddev2 stddev-heading form
         e = ExtendedKalmanFilterSLAM.get_error_ellipse(kf.covariance)
-        print >> f, "E %f %f %f %f" % (e + (sqrt(kf.covariance[2,2]),))
+        print("E %f %f %f %f" % (e + (sqrt(kf.covariance[2,2]),)), file=f)
         # Write estimates of landmarks.
         write_cylinders(f, "W C", kf.get_landmarks())
         # Write error ellipses of landmarks.
