@@ -51,33 +51,38 @@ class Particle:
                                             scanner_displacement):
         """Returns the expected distance and bearing measurement for a given
            landmark number and the pose of this particle."""
-        # --->>> Insert your previous code here.
-        return np.array([0.0, 0.0])  # Replace this.
+
+        z_hat = self.h(self.pose, self.landmark_positions[landmark_number], scanner_displacement)
+
+        return z_hat  
 
     def H_Ql_jacobian_and_measurement_covariance_for_landmark(
         self, landmark_number, Qt_measurement_covariance, scanner_displacement):
         """Computes Jacobian H of measurement function at the particle's
            position and the landmark given by landmark_number. Also computes the
            measurement covariance matrix."""
-        # --->>> Insert your previous code here.
-        H = np.eye(2)  # Replace this.
-        Ql = np.eye(2)  # Replace this.
+
+        H = self.dh_dlandmark(self.pose, self.landmark_positions[landmark_number], scanner_displacement)
+        Ql = H @ self.landmark_covariances[landmark_number] @ H.T + Qt_measurement_covariance
         return (H, Ql)
 
     def update_landmark(self, landmark_number, measurement,
                         Qt_measurement_covariance, scanner_displacement):
         """Update a landmark's estimated position and covariance."""
-        # --->>> Insert your new code here.
-        # Hints:
-        # - H and Ql can be computed using
-        #   H_Ql_jacobian_and_measurement_covariance_for_landmark()
-        # - Use np.linalg.inv(A) to compute the inverse of A
-        # - Delta z is measurement minus expected measurement
-        # - Expected measurement can be computed using
-        #   h_expected_measurement_for_landmark()
-        # - Remember to update landmark_positions[landmark_number] as well
-        #   as landmark_covariances[landmark_number].
-        pass  # Replace this.
+        
+        H, Ql = self.H_Ql_jacobian_and_measurement_covariance_for_landmark(landmark_number, \
+            Qt_measurement_covariance, scanner_displacement)
+        K = self.landmark_covariances[landmark_number] @ H.T @ np.linalg.inv(Ql)
+        delta_z = measurement - self.h_expected_measurement_for_landmark(landmark_number, \
+            scanner_displacement)
+        mean_old = self.landmark_positions[landmark_number]
+        mean_new = mean_old + K @ delta_z
+        KH = K @ H
+        cov_new = (np.eye(KH.shape[0]) - KH) @ self.landmark_covariances[landmark_number]
+
+
+        self.landmark_positions[landmark_number] = mean_new
+        self.landmark_covariances[landmark_number] = cov_new
 
 
 def insert_landmarks(particle):
@@ -99,15 +104,15 @@ def insert_landmarks(particle):
     particle.landmark_covariances.extend(covariances)
 
 def print_landmarks(particle):
-    for i in xrange(particle.number_of_landmarks()):
-        print "Landmark", i, "----------"
-        print " Position:", particle.landmark_positions[i]
-        print " Error ellipse:"
+    for i in range(particle.number_of_landmarks()):
+        print("Landmark", i, "----------")
+        print(" Position:", particle.landmark_positions[i])
+        print(" Error ellipse:")
         eigenvals, eigenvects = np.linalg.eig(particle.landmark_covariances[i])
         angle = atan2(eigenvects[1,0], eigenvects[0,0])
-        print "  Angle [deg]:", angle / pi * 180.0
-        print "  Axis 1:", sqrt(eigenvals[0])
-        print "  Axis 2:", sqrt(eigenvals[1])
+        print("  Angle [deg]:", angle / pi * 180.0)
+        print("  Axis 1:", sqrt(eigenvals[0]))
+        print("  Axis 2:", sqrt(eigenvals[1]))
 
 
 if __name__ == '__main__':
@@ -127,8 +132,8 @@ if __name__ == '__main__':
     # Insert the landmarks from the slam_10_c_new_landmark exercise.
     insert_landmarks(p)
 
-    # Print all landmarks (before update).
-    print "Landmarks - before update:"
+    # print(all landmarks (before update).
+    print("Landmarks - before update:")
     print_landmarks(p)
 
     # Measure first landmark.
@@ -143,6 +148,6 @@ if __name__ == '__main__':
     p.update_landmark(1, measurement, Qt_measurement_covariance,
                       scanner_displacement)
 
-    # Print all landmarks (after update).
-    print "\nLandmarks - after update:"
+    # print(all landmarks (after update).
+    print("\nLandmarks - after update:")
     print_landmarks(p)

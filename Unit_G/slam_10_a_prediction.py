@@ -79,7 +79,7 @@ if __name__ == '__main__':
     number_of_particles = 25
     start_state = np.array([500.0, 0.0, 45.0 / 180.0 * pi])
     initial_particles = [copy.copy(Particle(start_state))
-                         for _ in xrange(number_of_particles)]
+                         for _ in range(number_of_particles)]
 
     # Setup filter.
     fs = FastSLAM(initial_particles,
@@ -93,7 +93,7 @@ if __name__ == '__main__':
     # Loop over all motor tick records.
     # This is the FastSLAM filter loop, prediction only.
     f = open("fast_slam_prediction.txt", "w")
-    for i in xrange(len(logfile.motor_ticks)):
+    for i in range(len(logfile.motor_ticks)):
         # Prediction.
         control = map(lambda x: x * ticks_to_mm, logfile.motor_ticks[i])
         fs.predict(control)
@@ -103,13 +103,13 @@ if __name__ == '__main__':
 
         # Output state estimated from all particles.
         mean = get_mean(fs.particles)
-        print >> f, "F %.0f %.0f %.3f" %\
+        print("F %.0f %.0f %.3f" %\
               (mean[0] + scanner_displacement * cos(mean[2]),
                mean[1] + scanner_displacement * sin(mean[2]),
-               mean[2])
+               mean[2]), file=f)
 
         # Output error ellipse and standard deviation of heading.
         errors = get_error_ellipse_and_heading_variance(fs.particles, mean)
-        print >> f, "E %.3f %.0f %.0f %.3f" % errors
+        print("E %.3f %.0f %.0f %.3f" % errors, file=f)
 
     f.close()

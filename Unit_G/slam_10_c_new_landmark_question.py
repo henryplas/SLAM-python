@@ -45,16 +45,13 @@ class Particle:
         scanner_pose = (self.pose[0] + cos(self.pose[2]) * scanner_displacement,
                         self.pose[1] + sin(self.pose[2]) * scanner_displacement,
                         self.pose[2])
-        # --->>> Insert your code here.
-        # Hints:
-        # - LegoLogfile.scanner_to_world() (from lego_robot.py) will return
-        #   the world coordinate, given the scanner pose and the coordinate in
-        #   the scanner's system.
-        # - H is obtained from dh_dlandmark()
-        # - Use np.linalg.inv(A) to invert matrix A
-        # - As usual, np.dot(A,B) is the matrix product of A and B.
-        self.landmark_positions.append(np.array([0.0, 0.0]))  # Replace this.
-        self.landmark_covariances.append(np.eye(2))  # Replace this.
+
+       
+        m = LegoLogfile.scanner_to_world(scanner_pose, measurement_in_scanner_system)
+        H_inv = np.linalg.inv( self.dh_dlandmark(self.pose, m, scanner_displacement) )
+        covariance = H_inv @ Qt_measurement_covariance @ H_inv.T
+        self.landmark_positions.append(np.array(m))  
+        self.landmark_covariances.append(covariance)  
 
 
 if __name__ == '__main__':
@@ -89,13 +86,13 @@ if __name__ == '__main__':
                               scanner_displacement)
 
     # Print all landmarks.
-    for i in xrange(p.number_of_landmarks()):
-        print "Landmark", i, "----------"
-        print " Position:", p.landmark_positions[i]
-        print " Landmark covariance:\n ", p.landmark_covariances[i]
-        print " This corresponds to the error ellipse:"
+    for i in range(p.number_of_landmarks()):
+        print("Landmark", i, "----------")
+        print (" Position:", p.landmark_positions[i])
+        print( " Landmark covariance:\n ", p.landmark_covariances[i])
+        print (" This corresponds to the error ellipse:")
         eigenvals, eigenvects = np.linalg.eig(p.landmark_covariances[i])
         angle = atan2(eigenvects[1,0], eigenvects[0,0])
-        print " Angle [deg]:", angle / pi * 180.0
-        print " Axis 1:", sqrt(eigenvals[0])
-        print " Axis 2:", sqrt(eigenvals[1])
+        print (" Angle [deg]:", angle / pi * 180.0)
+        print (" Axis 1:", sqrt(eigenvals[0]))
+        print (" Axis 2:", sqrt(eigenvals[1]))
